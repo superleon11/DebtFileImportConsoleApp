@@ -1,4 +1,5 @@
 ﻿using System.Collections;
+using System.Diagnostics;
 
 namespace DebtFileImportConsoleApp
 {
@@ -9,8 +10,31 @@ namespace DebtFileImportConsoleApp
         public string AccountNumber { get; set; }
         public string Name { get; set; }
         public decimal Amount { get; set; }
-        public int Telephone { get; set; }
+        public string Telephone { get; set; }
     }
+
+    public class RejectedRecord
+    {
+        public int RowId { get; set; }
+        public string AccountNumber { get; set; }
+        public string Name { get; set; }
+        public decimal Amount { get; set; }
+        public string Telephone { get; set; }
+
+        public RejectionReason RejectionReason { get; set; }
+    }
+
+    public enum RejectionReason
+    {
+        InvalidAccountNumber = 1,
+        InvalidAmount = 2,
+        InvalidPhoneNumber = 3,
+        EmptyLine = 4,
+        Other = 5
+
+    }
+
+
 
     internal class Program
     {
@@ -59,10 +83,15 @@ namespace DebtFileImportConsoleApp
 
         static ArrayList ProcessInputFile(string filePath, string extension)
         {
-            //Uses this to set what the delimiter will be based on the file extension.
+
             var delimiter = "";
             var rowId = 1;
+            var errorRowId = 1;
+            RejectionReason rejectionReason = 0;
             var clientList = new ArrayList();
+            var errorList = new ArrayList();
+
+            //Checks the file extension and then sets the delimiter accordingly
             if (extension.Equals(".csv", StringComparison.OrdinalIgnoreCase))
             {
                 delimiter = ",";
@@ -77,36 +106,159 @@ namespace DebtFileImportConsoleApp
             if (lines.Count == 0)
             {
                 Console.WriteLine("Error: File is empty. Please upload file with data.");
-                return clientList; 
+                return clientList;
             }
 
             Console.WriteLine("Processing records...");
             foreach (var line in lines.Skip(1))
             {
+                Boolean isValid = true;
                 if (string.IsNullOrWhiteSpace(line)) continue;
 
                 var columns = line.Split(delimiter);
 
 
+
                 string accountNumber = columns[0].Trim();
                 string name = columns[1].Trim();
                 decimal amount = decimal.Parse(columns[2].Trim());
-                int phone = int.Parse(columns[3].Trim());
+                string phone = columns[3].Trim();
 
-                ClientRecord record = new ClientRecord
+                // Validates the account number to ensure it only contains letters, numbers, and hyphens
+                if (!checkAccountNumberValid(accountNumber))
                 {
-                    RowId = rowId,
-                    AccountNumber = accountNumber,
-                    Name = name,
-                    Amount = amount,
-                    Telephone = phone
-                };
-                clientList.Add(record);
-                rowId++;
-                Console.WriteLine($"Found: {name} ({accountNumber}) - Amount: {amount} - Phone number: {phone}");
+                    Console.WriteLine($"Warning: Invalid account number. Account: {accountNumber}, Name: {name}, Amount: {amount}, Phone: {phone}");
+                    isValid = false;
+                    rejectionReason = RejectionReason.InvalidAccountNumber;
+                }
+
+                string formattedName = FormatName(name);
+
+
+                if (!checkAmountValid(amount))
+                {
+                    Console.WriteLine($"Warning: Invalid amount. Account: {accountNumber}, Name: {name}, Amount: {amount}, Phone: {phone}");
+                    isValid = false;
+                    rejectionReason = RejectionReason.InvalidAmount;
+                }
+
+                // Validates the phone number to ensure meets required format
+                if (phone.Length > 0)
+                { 
+                    string cleanedPhone = cleanUpPhoneNumber(phone);
+                    if (cleanedPhone == "-")
+                    {
+                        Console.WriteLine($"Warning: Invalid phone number. Account: {accountNumber}, Name: {name}, Amount: {amount}, Original Phone: {phone}");
+                        isValid = false;
+                        rejectionReason = RejectionReason.InvalidPhoneNumber;
+                    }
+                    else
+                    {
+                        phone = cleanedPhone;
+                    }
+                }
+
+
+
+                if (isValid)
+                {
+                    ClientRecord record = new ClientRecord
+                    {
+                        RowId = rowId,
+                        AccountNumber = accountNumber,
+                        Name = formattedName,
+                        Amount = amount,
+                        Telephone = phone
+                    };
+                    clientList.Add(record);
+                    rowId++;
+                }
+                else
+                {
+                   RejectedRecord record = new RejectedRecord
+                    {
+                        RowId = errorRowId,
+                        AccountNumber = accountNumber,
+                        Name = formattedName,
+                        Amount = amount,
+                        Telephone = phone,
+                        RejectionReason = rejectionReason
+                    };
+                    errorList.Add(record);
+                    errorRowId++;
+                }
+                    Console.WriteLine($"Found: {name} ({accountNumber}) - Amount: {amount} - Phone number: {phone}");
             }
 
+            Console.WriteLine($"Total valid records processed: {clientList.Count}");
+            foreach (ClientRecord record in clientList)
+            {
+                Console.WriteLine($"RowId: {record.RowId}, AccountNumber: {record.AccountNumber}, Name: {record.Name}, Amount: {record.Amount}, Telephone: {record.Telephone}");
+            }
+            Console.WriteLine($"Total invalid records processed: {errorList.Count}");
+            foreach (RejectedRecord record in errorList)
+            {
+                Console.WriteLine($"RowId: {record.RowId}, AccountNumber: {record.AccountNumber}, Name: {record.Name}, Amount: {record.Amount}, Telephone: {record.Telephone}, RejectionReason: {record.RejectionReason}");
+            }
             return clientList;
+        }
+
+
+
+
+        static bool checkAccountNumberValid(string accountNumber)
+        {
+            if (string.IsNullOrWhiteSpace(accountNumber)) return false;
+
+            return accountNumber.All(c => char.IsLetterOrDigit(c) || c == '-');
+
+        }
+
+        static bool checkAmountValid(decimal amount)
+        {
+            return amount > 0;
+        }
+
+        static string FormatName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) 
+                return name;
+
+            var words = name.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 0; i < words.Length; i++)
+            {
+                words[i] = char.ToUpper(words[i][0]) + words[i].Substring(1).ToLower();
+            }
+            return string.Join(' ', words);
+        }
+
+
+
+        static string cleanUpPhoneNumber(string phoneNumber)
+        {
+            Console.WriteLine("============PHONE NUMBER PARSER===============");
+
+            var digitsOnly = new string(phoneNumber.Where(char.IsDigit).ToArray());
+
+            
+            if (digitsOnly.Length >= 10 && digitsOnly.Length <= 15)
+            {
+                if (phoneNumber.Contains("+"))
+                {
+                    digitsOnly = "+" + digitsOnly;
+                }
+                else
+                {
+                    digitsOnly = "+44" + digitsOnly;
+                }
+                Console.WriteLine($"Cleaned phone number: {digitsOnly} from original input: {phoneNumber}");
+                return digitsOnly;
+            }
+            else
+            {
+                Console.WriteLine($"Warning: Phone number '{phoneNumber}' is invalid after cleanup. Expected between 10 and 15 digits, got {digitsOnly.Length}.");
+                return "-"; 
+            }
         }
     }
 }
