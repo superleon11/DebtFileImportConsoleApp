@@ -11,6 +11,15 @@ namespace DebtFileImportConsoleApp
         public string Name { get; set; }
         public decimal Amount { get; set; }
         public string Telephone { get; set; }
+
+        public ClientRecord(int rowId, string accountNumber, string name, decimal amount, string telephone)
+        {
+            RowId = rowId;
+            AccountNumber = accountNumber;
+            Name = name;
+            Amount = amount;
+            Telephone = telephone;
+        }
     }
 
     public class RejectedRecord
@@ -22,6 +31,16 @@ namespace DebtFileImportConsoleApp
         public string Telephone { get; set; }
 
         public RejectionReason RejectionReason { get; set; }
+
+        public RejectedRecord(int rowId, string accountNumber, string name, decimal amount, string telephone, RejectionReason rejectionReason)
+        {
+            RowId = rowId;
+            AccountNumber = accountNumber;
+            Name = name;
+            Amount = amount;
+            Telephone = telephone;
+            RejectionReason = rejectionReason;
+        }
     }
 
     public enum RejectionReason
@@ -74,9 +93,22 @@ namespace DebtFileImportConsoleApp
                 return;
             }
 
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            var dataList = ProcessInputFile(filePath, extension);
+            if (dataList.Count > 0 && dataList[0] is ArrayList validRecords)
+            {
+                DataExporter.ExportCompletedRecordsToCsv(validRecords, filePath, extension);
+            }
 
-            var clientList = ProcessInputFile(filePath, extension);
-            DataExporter.ExportCompletedRecordsToCsv(clientList, filePath, extension);
+            if (dataList.Count > 0 && dataList[1] is ArrayList errorRecords)
+            {
+                DataExporter.ExportErrorRecordsToCsv(errorRecords, filePath);
+            }
+
+            stopwatch.Stop();
+            TimeSpan ts = stopwatch.Elapsed;
+
+            DataExporter.CreateProcessingReport(dataList, ts);
 
         }
 
@@ -92,6 +124,7 @@ namespace DebtFileImportConsoleApp
             RejectionReason rejectionReason = 0;
             var clientList = new ArrayList();
             var errorList = new ArrayList();
+            var combinedList = new ArrayList();
 
             //Checks the file extension and then sets the delimiter accordingly
             if (extension.Equals(".csv", StringComparison.OrdinalIgnoreCase))
@@ -115,7 +148,11 @@ namespace DebtFileImportConsoleApp
             foreach (var line in lines.Skip(1))
             {
                 Boolean isValid = true;
-                if (string.IsNullOrWhiteSpace(line)) continue;
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    RejectedRecord record = new RejectedRecord(0, "", "", 0, "", RejectionReason.EmptyLine);
+                    continue;
+                }
 
                 var columns = line.Split(delimiter);
 
@@ -164,28 +201,13 @@ namespace DebtFileImportConsoleApp
 
                 if (isValid)
                 {
-                    ClientRecord record = new ClientRecord
-                    {
-                        RowId = rowId,
-                        AccountNumber = accountNumber,
-                        Name = formattedName,
-                        Amount = amount,
-                        Telephone = phone
-                    };
+                    ClientRecord record = new ClientRecord(rowId, accountNumber, formattedName, amount, phone);
                     clientList.Add(record);
                     rowId++;
                 }
                 else
                 {
-                   RejectedRecord record = new RejectedRecord
-                    {
-                        RowId = errorRowId,
-                        AccountNumber = accountNumber,
-                        Name = formattedName,
-                        Amount = amount,
-                        Telephone = phone,
-                        RejectionReason = rejectionReason
-                    };
+                   RejectedRecord record = new RejectedRecord(rowId, accountNumber, formattedName, amount, phone, rejectionReason);
                     errorList.Add(record);
                     errorRowId++;
                 }
@@ -203,12 +225,10 @@ namespace DebtFileImportConsoleApp
                 Console.WriteLine($"RowId: {record.RowId}, AccountNumber: {record.AccountNumber}, Name: {record.Name}, Amount: {record.Amount}, Telephone: {record.Telephone}, RejectionReason: {record.RejectionReason}");
             }
 
-            if(errorList.Count > 0)
-            {
-                DataExporter.ExportErrorRecordsToCsv(errorList, filePath);
-                Console.WriteLine($"Error records exported to: errors_{filePath}");
-            }
-            return clientList;
+         
+            combinedList.Add(clientList);
+            combinedList.Add(errorList);
+            return combinedList;
         }
 
 
@@ -329,6 +349,54 @@ namespace DebtFileImportConsoleApp
                     writer.WriteLine($"{record.RowId}{delimiter}{record.AccountNumber}{delimiter}{record.Name}{delimiter}{record.Amount}{delimiter}{record.Telephone}{delimiter}{record.RejectionReason}");
                 }
             }
+        }
+
+
+        public static void CreateProcessingReport(ArrayList dataList, TimeSpan ts)
+        {
+            var compeletedRecords = new ArrayList();
+            var errorRecords = new ArrayList();
+
+            if (dataList.Count > 0 && dataList[0] is ArrayList validRecords)
+            {
+                compeletedRecords = validRecords;
+            }
+
+            if (dataList.Count > 0 && dataList[1] is ArrayList errorRecord)
+            {
+                errorRecords = errorRecord;
+            }
+
+
+            string reportFileName = $"report_{DateTime.Now:yyyyMMdd_HHmmss}.txt";
+
+            int completedCount = compeletedRecords.Count;
+            int errorCount = errorRecords.Count;
+            int totalRecords = completedCount + errorCount;
+
+
+            using (var writer = new StreamWriter(reportFileName))
+            {
+                writer.WriteLine("Processing Report");
+                writer.WriteLine("=================");
+                writer.WriteLine($"Total records processed: {totalRecords}");
+                writer.WriteLine($"Valid records: {completedCount}");
+                writer.WriteLine($"Invalid records: {errorCount}");
+                writer.WriteLine($"Processing time: {ts.TotalSeconds} seconds");
+
+
+
+
+
+                Console.WriteLine("Processing Report");
+                Console.WriteLine("=================");
+                Console.WriteLine($"Total records processed: {totalRecords}");
+                Console.WriteLine($"Valid records: {completedCount}");
+                Console.WriteLine($"Invalid records: {errorCount}");
+                Console.WriteLine($"Processing time: {ts.TotalSeconds} seconds");
+            }
+
+
         }
 
     }
