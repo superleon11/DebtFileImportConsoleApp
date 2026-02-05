@@ -1,5 +1,17 @@
-﻿namespace DebtFileImportConsoleApp
+﻿using System.Collections;
+
+namespace DebtFileImportConsoleApp
 {
+
+    public class ClientRecord
+    {
+        public int RowId { get; set; }
+        public string AccountNumber { get; set; }
+        public string Name { get; set; }
+        public decimal Amount { get; set; }
+        public int Telephone { get; set; }
+    }
+
     internal class Program
     {
         static void Main(string[] args)
@@ -39,16 +51,18 @@
             }
 
 
-            ProcessInputFile(filePath, extension);
+            var clientList = ProcessInputFile(filePath, extension);
         }
 
 
 
 
-        static void ProcessInputFile(string filePath, string extension)
+        static ArrayList ProcessInputFile(string filePath, string extension)
         {
             //Uses this to set what the delimiter will be based on the file extension.
             var delimiter = "";
+            var rowId = 1;
+            var clientList = new ArrayList();
             if (extension.Equals(".csv", StringComparison.OrdinalIgnoreCase))
             {
                 delimiter = ",";
@@ -63,7 +77,7 @@
             if (lines.Count == 0)
             {
                 Console.WriteLine("Error: File is empty. Please upload file with data.");
-                return;
+                return clientList; 
             }
 
             Console.WriteLine("Processing records...");
@@ -76,17 +90,24 @@
 
                 string accountNumber = columns[0].Trim();
                 string name = columns[1].Trim();
-                string amount = columns[2].Trim();
-                string phone = columns[3].Trim();
+                decimal amount = decimal.Parse(columns[2].Trim());
+                int phone = int.Parse(columns[3].Trim());
 
-                // Perform your business logic here
+                ClientRecord record = new ClientRecord
+                {
+                    RowId = rowId,
+                    AccountNumber = accountNumber,
+                    Name = name,
+                    Amount = amount,
+                    Telephone = phone
+                };
+                clientList.Add(record);
+                rowId++;
                 Console.WriteLine($"Found: {name} ({accountNumber}) - Amount: {amount} - Phone number: {phone}");
             }
+
+            return clientList;
         }
-
-
-
-
     }
 }
 
