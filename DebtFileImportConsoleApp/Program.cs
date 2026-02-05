@@ -150,7 +150,9 @@ namespace DebtFileImportConsoleApp
                 Boolean isValid = true;
                 if (string.IsNullOrWhiteSpace(line))
                 {
-                    RejectedRecord record = new RejectedRecord(0, "", "", 0, "", RejectionReason.EmptyLine);
+                    RejectedRecord record = new RejectedRecord(errorRowId, "", "", 0, "", RejectionReason.EmptyLine);
+                    errorList.Add(record);
+                    errorRowId++;
                     continue;
                 }
 
@@ -207,7 +209,7 @@ namespace DebtFileImportConsoleApp
                 }
                 else
                 {
-                   RejectedRecord record = new RejectedRecord(rowId, accountNumber, formattedName, amount, phone, rejectionReason);
+                   RejectedRecord record = new RejectedRecord(errorRowId, accountNumber, formattedName, amount, phone, rejectionReason);
                     errorList.Add(record);
                     errorRowId++;
                 }
@@ -374,6 +376,20 @@ namespace DebtFileImportConsoleApp
             int errorCount = errorRecords.Count;
             int totalRecords = completedCount + errorCount;
 
+            var counts = new Dictionary<RejectionReason, int>();
+
+            foreach (RejectedRecord record in errorRecords)
+            {
+                if (counts.ContainsKey(record.RejectionReason))
+                {
+                    counts[record.RejectionReason]++;
+                }
+                else
+                {
+                    counts[record.RejectionReason] = 1;
+                }
+            }
+
 
             using (var writer = new StreamWriter(reportFileName))
             {
@@ -383,6 +399,14 @@ namespace DebtFileImportConsoleApp
                 writer.WriteLine($"Valid records: {completedCount}");
                 writer.WriteLine($"Invalid records: {errorCount}");
                 writer.WriteLine($"Processing time: {ts.TotalSeconds} seconds");
+                writer.WriteLine("=================");
+                writer.WriteLine("Rejected Record Reasons");
+                foreach (var entry in counts)
+                {
+                    writer.WriteLine($"{entry.Key} occurred {entry.Value} times.");
+                }
+
+
 
 
 
@@ -394,6 +418,14 @@ namespace DebtFileImportConsoleApp
                 Console.WriteLine($"Valid records: {completedCount}");
                 Console.WriteLine($"Invalid records: {errorCount}");
                 Console.WriteLine($"Processing time: {ts.TotalSeconds} seconds");
+                Console.WriteLine("=================");
+                Console.WriteLine("Rejected Record Reasons");
+                foreach (var entry in counts)
+                {
+                    Console.WriteLine($"{entry.Key} occurred {entry.Value} times.");
+                }
+
+
             }
 
 
