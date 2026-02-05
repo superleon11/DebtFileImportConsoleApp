@@ -76,6 +76,8 @@ namespace DebtFileImportConsoleApp
 
 
             var clientList = ProcessInputFile(filePath, extension);
+            DataExporter.ExportCompletedRecordsToCsv(clientList, filePath, extension);
+
         }
 
 
@@ -200,6 +202,12 @@ namespace DebtFileImportConsoleApp
             {
                 Console.WriteLine($"RowId: {record.RowId}, AccountNumber: {record.AccountNumber}, Name: {record.Name}, Amount: {record.Amount}, Telephone: {record.Telephone}, RejectionReason: {record.RejectionReason}");
             }
+
+            if(errorList.Count > 0)
+            {
+                DataExporter.ExportErrorRecordsToCsv(errorList, filePath);
+                Console.WriteLine($"Error records exported to: errors_{filePath}");
+            }
             return clientList;
         }
 
@@ -260,6 +268,69 @@ namespace DebtFileImportConsoleApp
                 return "-"; 
             }
         }
+
+    }
+
+
+
+    internal class DataExporter
+    {
+
+
+        public static void ExportCompletedRecordsToCsv(ArrayList clientList, string outputPath, string extension)
+        {
+            if(clientList.Count == 0 || clientList == null)
+            {
+                Console.WriteLine("No valid records to export.");
+                return;
+            }
+            var delimiter = "";
+            string newFileName = "clean_" + outputPath;
+            //Checks the file extension and then sets the delimiter accordingly
+            if (extension.Equals(".csv", StringComparison.OrdinalIgnoreCase))
+            {
+                delimiter = ",";
+            }
+            else if (extension.Equals(".txt", StringComparison.OrdinalIgnoreCase))
+            {
+                delimiter = "|";
+            }
+
+
+            using (var writer = new StreamWriter(newFileName))
+            {
+                writer.WriteLine($"RowId{delimiter}AccountNumber{delimiter}Name{delimiter}Amount{delimiter}Telephone");
+                foreach (ClientRecord record in clientList)
+                {
+                    writer.WriteLine($"{record.RowId}{delimiter}{record.AccountNumber}{delimiter}{record.Name}{delimiter}{record.Amount}{delimiter}{record.Telephone}");
+                }
+            }
+        }
+
+
+        public static void ExportErrorRecordsToCsv(ArrayList clientList, string outputPath)
+        {
+            if (clientList.Count == 0 || clientList == null)
+            {
+                Console.WriteLine("No valid records to export.");
+                return;
+            }
+            var delimiter = ",";
+            string newFileName = "errors_" + Path.GetFileNameWithoutExtension(outputPath) + ".csv";
+            ;
+           
+
+
+            using (var writer = new StreamWriter(newFileName))
+            {
+                writer.WriteLine($"RowId{delimiter}AccountNumber{delimiter}Name{delimiter}Amount{delimiter}Telephone{delimiter}Error Reason");
+                foreach (RejectedRecord record in clientList)
+                {
+                    writer.WriteLine($"{record.RowId}{delimiter}{record.AccountNumber}{delimiter}{record.Name}{delimiter}{record.Amount}{delimiter}{record.Telephone}{delimiter}{record.RejectionReason}");
+                }
+            }
+        }
+
     }
 }
 
