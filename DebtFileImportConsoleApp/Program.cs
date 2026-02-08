@@ -4,6 +4,8 @@ using System.Diagnostics;
 namespace DebtFileImportConsoleApp
 {
 
+
+    // Class to store the valid data
     public class ClientRecord
     {
         public int RowId { get; set; }
@@ -22,6 +24,7 @@ namespace DebtFileImportConsoleApp
         }
     }
 
+    // Class to store the invalid data
     public class RejectedRecord
     {
         public int RowId { get; set; }
@@ -43,6 +46,7 @@ namespace DebtFileImportConsoleApp
         }
     }
 
+    // Enum to store the different reasons for record rejection
     public enum RejectionReason
     {
         InvalidAccountNumber = 1,
@@ -136,7 +140,7 @@ namespace DebtFileImportConsoleApp
                 delimiter = "|";
             }
 
-
+            // Check for empty file, if the file is empty then it displays an error message and returns an empty list.
             var lines = File.ReadLines(filePath).ToList();
             if (lines.Count == 0)
             {
@@ -148,6 +152,8 @@ namespace DebtFileImportConsoleApp
             foreach (var line in lines.Skip(1))
             {
                 Boolean isValid = true;
+
+                //Check if line is empty, if it is then it adds to rejected records list with the reason for rejection and then continues to the next line.
                 if (string.IsNullOrWhiteSpace(line))
                 {
                     RejectedRecord record = new RejectedRecord(errorRowId, "", "", 0, "", RejectionReason.EmptyLine);
@@ -175,7 +181,7 @@ namespace DebtFileImportConsoleApp
 
                 string formattedName = FormatName(name);
 
-
+                // Validates the amount to ensure it is a positive number
                 if (!checkAmountValid(amount))
                 {
                     Console.WriteLine($"Warning: Invalid amount. Account: {accountNumber}, Name: {name}, Amount: {amount}, Phone: {phone}");
@@ -200,7 +206,7 @@ namespace DebtFileImportConsoleApp
                 }
 
 
-
+                // If all validations pass, the record is added to the list of valid records, otherwise it is added to the list of rejected records with the reason for rejection.
                 if (isValid)
                 {
                     ClientRecord record = new ClientRecord(rowId, accountNumber, formattedName, amount, phone);
@@ -235,7 +241,7 @@ namespace DebtFileImportConsoleApp
 
 
 
-
+        // Validates the account number to ensure it only contains letters, numbers, and hyphens. If the account number is null, empty, or contains invalid characters, it returns false; otherwise, it returns true.
         static bool checkAccountNumberValid(string accountNumber)
         {
             if (string.IsNullOrWhiteSpace(accountNumber)) return false;
@@ -244,11 +250,13 @@ namespace DebtFileImportConsoleApp
 
         }
 
+        // Validates the amount to ensure it is a positive number. If the amount is greater than 0, it returns true; otherwise, it returns false.
         static bool checkAmountValid(decimal amount)
         {
             return amount > 0;
         }
 
+        // Formats the name by capitalizing the first letter of each word and making the rest of the letters lowercase. If the name is null or whitespace, it returns the original name; otherwise, it processes the name and returns the formatted version.
         static string FormatName(string name)
         {
             if (string.IsNullOrWhiteSpace(name)) 
@@ -263,7 +271,7 @@ namespace DebtFileImportConsoleApp
         }
 
 
-
+        // Cleans up the phone number by removing non-digit characters and ensuring it has the correct format. It extracts only the digits from the input phone number and checks if the resulting string has between 10 and 15 digits. If it does, it adds a "+" prefix if the original phone number contains one, or defaults to adding "+44" if not. If the cleaned phone number is valid, it returns the cleaned version; otherwise, it returns a placeholder "-" to indicate an invalid phone number.
         static string cleanUpPhoneNumber(string phoneNumber)
         {
             Console.WriteLine("============PHONE NUMBER PARSER===============");
@@ -294,11 +302,11 @@ namespace DebtFileImportConsoleApp
     }
 
 
-
+    //Class used to export the data into various files
     internal class DataExporter
     {
 
-
+        // Exports the list of valid client records to a new CSV or TXT file, depending on the original file extension. It checks if there are any valid records to export and sets the appropriate delimiter based on the file extension. It then writes the header and each valid record to the new file, which is prefixed with "clean_" followed by the original file name.
         public static void ExportCompletedRecordsToCsv(ArrayList clientList, string outputPath, string extension)
         {
             if(clientList.Count == 0 || clientList == null)
@@ -329,7 +337,7 @@ namespace DebtFileImportConsoleApp
             }
         }
 
-
+        // Exports the list of rejected records to a new CSV file. It checks if there are any rejected records to export and sets the delimiter to a comma. It then writes the header and each rejected record, including the reason for rejection, to a new file prefixed with "errors_" followed by the original file name.
         public static void ExportErrorRecordsToCsv(ArrayList clientList, string outputPath)
         {
             if (clientList.Count == 0 || clientList == null)
@@ -353,7 +361,7 @@ namespace DebtFileImportConsoleApp
             }
         }
 
-
+        // Creates a processing report that summarizes the results of the data processing, including the total number of records processed, the number of valid and invalid records, the processing time, and a breakdown of the reasons for record rejection. The report is written to a text file with a timestamped name and also printed to the console.
         public static void CreateProcessingReport(ArrayList dataList, TimeSpan ts)
         {
             var compeletedRecords = new ArrayList();
@@ -411,7 +419,7 @@ namespace DebtFileImportConsoleApp
 
 
 
-
+                //Also logs the report to the console
                 Console.WriteLine("Processing Report");
                 Console.WriteLine("=================");
                 Console.WriteLine($"Total records processed: {totalRecords}");
